@@ -1,0 +1,4 @@
+node_modules/
+04-jwt-rs256-inspector/keys/
+*.pem
+.env

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Host (Portal) — postMessage SSO demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f5f4f0; color: #2c2c2a; padding: 2rem; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.sub { color: #888780; font-size: 13px; margin-bottom: 24px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .panel { flex: 1; min-width: 280px; background: #fff; border: 1px solid #d3d1c7; border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 13px; margin-bottom: 8px; }
+  iframe { width: 100%; height: 160px; border: 1px dashed #d3d1c7; border-radius: 6px; }
+  button { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid #1D9E75; background: #E1F5EE; color: #085041; cursor: pointer; margin-right: 8px; }
+  #log { background: #1a1a18; color: #d4f5e5; font-family: ui-monospace, monospace; font-size: 12px; padding: 12px; border-radius: 8px; height: 220px; overflow-y: auto; white-space: pre-wrap; }
+  .ok { color: #7be3b0; }
+  .bad { color: #ff9d8a; }
+</style>
+</head>
+<body>
+  <h1>Host (Portal) — origin http://localhost:4000</h1>
+  <p class="sub">Demonstrates the postMessage auth handshake: host → trusted iframe (token in) → host (ack out), plus a hidden silent-renewal iframe and a blocked cross-origin sender.</p>
+
+  <div class="row">
+    <button id="btn-handshake">1. Run auth handshake (trusted iframe)</button>
+    <button id="btn-renew">2. Trigger silent renewal (hidden iframe)</button>
+    <button id="btn-attack">3. Simulate message from untrusted origin</button>
+  </div>
+
+  <div class="row">
+    <div class="panel">
+      <h2>Trusted iframe — http://localhost:4001/auth.html</h2>
+      <iframe id="auth-frame" src="about:blank"></iframe>
+    </div>
+    <div class="panel">
+      <h2>Hidden silent-renew iframe — http://localhost:4001/silent-renew.html</h2>
+      <iframe id="renew-frame" src="about:blank" style="height:60px"></iframe>
+    </div>
+  </div>
+
+  <div id="log"></div>
+
+<script>
+  const TRUSTED_ORIGIN = "http://localhost:4001";
+  const log = document.getElementById("log");
+  function line(text, cls) {
+    const div = document.createElement("div");
+    if (cls) div.className = cls;
+    div.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // The ONLY thing that makes postMessage safe: verifying event.origin
+  // against an explicit whitelist before trusting event.data in any way.
+  window.addEventListener("message", (event) => {
+    if (event.origin !== TRUSTED_ORIGIN) {
+      line(`REJECTED message from untrusted origin "${event.origin}": ${JSON.stringify(event.data)}`, "bad");
+      return;
+    }
+    line(`accepted message from ${event.origin}: ${JSON.stringify(event.data)}`, "ok");
+  });
+
+  document.getElementById("btn-handshake").addEventListener("click", () => {
+    const frame = document.getElementById("auth-frame");
+    frame.src = TRUSTED_ORIGIN + "/auth.html";
+    frame.onload = () => {
+      const fakeToken = "demo-session-token." + Math.random().toString(36).slice(2);
+      line(`host -> iframe: postMessage({type:"auth", token:"${fakeToken}"}) to ${TRUSTED_ORIGIN}`);
+      // Second arg (targetOrigin) is the outbound half of the same discipline:
+      // never use "*" here either, or you'd hand the token to whatever the
+      // iframe currently happens to be showing.
+      frame.contentWindow.postMessage({ type: "auth", token: fakeToken }, TRUSTED_ORIGIN);
+    };
+  });
+
+  document.getElementById("btn-renew").addEventListener("click", () => {
+    const frame = document.getElementById("renew-frame");
+    line(`host -> loading hidden renew iframe (simulates prompt=none silent auth)`);
+    frame.src = TRUSTED_ORIGIN + "/silent-renew.html";
+  });
+
+  document.getElementById("btn-attack").addEventListener("click", async () => {
+    line(`opening popup from untrusted origin http://localhost:4002 to send a forged message...`);
+    const win = window.open("http://localhost:4002/attack.html", "attacker", "width=420,height=200");
+    if (!win) line("popup blocked by browser — open it manually to see the attempt", "bad");
+  });
+</script>
+</body>
+</html>

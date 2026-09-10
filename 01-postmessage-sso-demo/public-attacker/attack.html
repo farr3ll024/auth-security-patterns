@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Untrusted origin — forged message attempt</title>
+</head>
+<body style="font-family:system-ui,sans-serif;font-size:13px;padding:16px;background:#faece7;">
+  <p>This page runs on <code>http://localhost:4002</code> — not on the host's
+  whitelist. It will try to postMessage the opener directly, forging the same
+  shape of message the trusted iframe sends. The host's origin check on
+  <code>window.addEventListener("message")</code> rejects it.</p>
+<script>
+  if (window.opener) {
+    window.opener.postMessage({ type: "auth-complete", ok: true, forged: true }, "http://localhost:4000");
+    document.body.innerHTML += "<p><strong>Forged message sent.</strong> Check the host's log — it should show REJECTED.</p>";
+  } else {
+    document.body.innerHTML += "<p>No window.opener — open this from the host page's button.</p>";
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Silent renew</title>
+</head>
+<body style="font-family:system-ui,sans-serif;font-size:11px;padding:6px;margin:0;">
+<script>
+  // Silent renewal: a hidden iframe on the auth origin, loaded with no
+  // user interaction, that mints a fresh token if the user already has a
+  // live session cookie on THIS origin (the "prompt=none" pattern). Because
+  // it runs in a hidden iframe with no visible UI, the parent never sees a
+  // login screen flash — it just gets a new token or a "renewal failed"
+  // signal and reacts accordingly (e.g. redirect to full login on failure).
+  const HOST_ORIGIN = "http://localhost:4000";
+  const hasSimulatedSession = true; // stand-in for an httpOnly session cookie check
+
+  if (hasSimulatedSession) {
+    const renewedToken = "renewed-token." + Math.random().toString(36).slice(2);
+    parent.postMessage({ type: "silent-renew", ok: true, token: renewedToken }, HOST_ORIGIN);
+  } else {
+    parent.postMessage({ type: "silent-renew", ok: false, reason: "login_required" }, HOST_ORIGIN);
+  }
+</script>
+</body>
+</html>

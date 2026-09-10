@@ -1,0 +1,50 @@
+name: dotnet-sqlserver-starter
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD:-DevPassw0rd!}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"
+    ports:
+      - "10000:10000" # blob
+      - "10001:10001" # queue
+      - "10002:10002" # table
+    volumes:
+      - azurite-data:/data
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: "Server=sqlserver,1433;Database=AppDb;User Id=sa;Password=${SA_PASSWORD:-DevPassw0rd!};TrustServerCertificate=True"
+      Storage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+    ports:
+      - "8080:8080"
+
+volumes:
+  sqlserver-data:
+  azurite-data:

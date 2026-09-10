@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Trusted iframe — auth</title>
+<style>
+  body { font-family: system-ui, sans-serif; font-size: 12px; padding: 10px; margin: 0; background: #f0f7f3; color: #2c2c2a; }
+  #status { font-weight: 600; }
+</style>
+</head>
+<body>
+  <div id="status">waiting for auth message…</div>
+<script>
+  // The parent's origin is known and fixed for this integration — whitelist it,
+  // don't infer it from document.referrer (spoofable) or accept "*".
+  const HOST_ORIGIN = "http://localhost:4000";
+
+  window.addEventListener("message", (event) => {
+    if (event.origin !== HOST_ORIGIN) {
+      document.getElementById("status").textContent =
+        `blocked message from unexpected origin: ${event.origin}`;
+      return;
+    }
+    if (event.data?.type !== "auth") return;
+
+    document.getElementById("status").textContent =
+      `received token from ${event.origin}, "authenticating"…`;
+
+    // Simulated auth: in a real MFE this would validate the token against
+    // the auth service and establish a session for this origin.
+    setTimeout(() => {
+      document.getElementById("status").textContent = "authenticated — sending ack to host";
+      event.source.postMessage({ type: "auth-complete", ok: true }, event.origin);
+    }, 400);
+  });
+</script>
+</body>
+</html>
