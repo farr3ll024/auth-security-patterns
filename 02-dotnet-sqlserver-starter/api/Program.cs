@@ -9,10 +9,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 var app = builder.Build();
 
 // Applies whatever migrations exist under EF's migration history on
-// container start, then seeds dev data. Run `dotnet ef migrations add
-// InitialCreate` once you've shaped AppDbContext's models the way you want —
-// this template intentionally ships with no migrations committed yet, since
-// the schema is project-specific.
+// container start, then seeds dev data. Ships with one InitialCreate
+// migration matching the User/ApiKey models below — once you change the
+// schema for a real project, run `dotnet ef migrations add <Name>` to add
+// the next one; Migrate() picks up anything unapplied automatically.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

@@ -25,6 +25,7 @@
     <button id="btn-handshake">1. Run auth handshake (trusted iframe)</button>
     <button id="btn-renew">2. Trigger silent renewal (hidden iframe)</button>
     <button id="btn-attack">3. Simulate message from untrusted origin</button>
+    <button id="btn-typo">4. Misconfigured targetOrigin (silent failure)</button>
   </div>
 
   <div class="row">
@@ -35,6 +36,10 @@
     <div class="panel">
       <h2>Hidden silent-renew iframe — http://localhost:4001/silent-renew.html</h2>
       <iframe id="renew-frame" src="about:blank" style="height:60px"></iframe>
+    </div>
+    <div class="panel">
+      <h2>Same trusted iframe, wrong targetOrigin</h2>
+      <iframe id="typo-frame" src="about:blank"></iframe>
     </div>
   </div>
 
@@ -51,6 +56,8 @@
     log.scrollTop = log.scrollHeight;
   }
 
+  let awaitingTypoAck = false;
+
   // The ONLY thing that makes postMessage safe: verifying event.origin
   // against an explicit whitelist before trusting event.data in any way.
   window.addEventListener("message", (event) => {
@@ -59,6 +66,7 @@
       return;
     }
     line(`accepted message from ${event.origin}: ${JSON.stringify(event.data)}`, "ok");
+    awaitingTypoAck = false;
   });
 
   document.getElementById("btn-handshake").addEventListener("click", () => {
@@ -84,6 +92,27 @@
     line(`opening popup from untrusted origin http://localhost:4002 to send a forged message...`);
     const win = window.open("http://localhost:4002/attack.html", "attacker", "width=420,height=200");
     if (!win) line("popup blocked by browser — open it manually to see the attempt", "bad");
+  });
+
+  document.getElementById("btn-typo").addEventListener("click", () => {
+    const frame = document.getElementById("typo-frame");
+    frame.src = TRUSTED_ORIGIN + "/auth.html";
+    frame.onload = () => {
+      const fakeToken = "demo-session-token." + Math.random().toString(36).slice(2);
+      // Deliberate bug: this should be TRUSTED_ORIGIN (4001), but points at
+      // 4002 instead — a copy-paste/typo mistake that's easy to make and
+      // easy to miss in review.
+      const wrongTargetOrigin = "http://localhost:4002";
+      line(`host -> iframe: postMessage(..., targetOrigin="${wrongTargetOrigin}") — WRONG, iframe is actually at ${TRUSTED_ORIGIN}`);
+      awaitingTypoAck = true;
+      frame.contentWindow.postMessage({ type: "auth", token: fakeToken }, wrongTargetOrigin);
+      setTimeout(() => {
+        if (awaitingTypoAck) {
+          line(`no ack after 2s. The browser silently dropped the message — targetOrigin must match the target window's ACTUAL origin exactly, or delivery just never happens. No exception, no console warning, nothing to catch in a try/catch. This is why a typo'd targetOrigin is one of the hardest postMessage bugs to spot.`, "bad");
+          awaitingTypoAck = false;
+        }
+      }, 2000);
+    };
   });
 </script>
 </body>

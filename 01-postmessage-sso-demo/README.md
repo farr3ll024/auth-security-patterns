@@ -1,8 +1,10 @@
 # postMessage SSO demo
 
 Reference implementation of a cross-origin iframe auth handshake using
-`window.postMessage`, plus the silent-renewal ("prompt=none") pattern and a
-demo of what happens when an untrusted origin tries to forge a message.
+`window.postMessage`, plus the silent-renewal ("prompt=none") pattern, a
+demo of what happens when an untrusted origin tries to forge a message, and
+a demo of the opposite mistake — a misconfigured `targetOrigin` that fails
+completely silently.
 
 ## Run
 
@@ -10,7 +12,7 @@ demo of what happens when an untrusted origin tries to forge a message.
 node server.mjs
 ```
 
-Then open http://localhost:4000 and click through the three buttons in order:
+Then open http://localhost:4000 and click through the four buttons in order:
 
 1. **Run auth handshake** — host loads the trusted iframe (`localhost:4001`),
    sends a token via `postMessage`, the iframe validates `event.origin`,
@@ -22,6 +24,13 @@ Then open http://localhost:4000 and click through the three buttons in order:
    `localhost:4002` (a different origin, standing in for an attacker-controlled
    page) that tries to post a forged `auth-complete` message straight at the
    host window. The host's origin whitelist check rejects it — watch the log.
+4. **Misconfigured targetOrigin** — same trusted iframe, same real token, but
+   `postMessage`'s second argument is deliberately typo'd to the wrong
+   origin. The browser refuses delivery because `targetOrigin` must match the
+   target window's actual origin — but unlike the origin-check rejection
+   above, this fails with **no event, no exception, no console warning**.
+   The log times out after 2s with nothing to show for it. This is the
+   opposite failure mode from #3, and in practice the harder one to debug.
 
 ## What this demonstrates
 
